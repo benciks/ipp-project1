@@ -1,11 +1,11 @@
 <?php
 ini_set('display_errors', 'stderr');
 // TODO: Add help prompt
-// TODO: Correct the exit codes based on assignment
+
 // Check arguments
 if (isset($argv[1])) {
   if ($argv[1] == '--help') {
-    echo "Display help";
+    echo "Usage: php parse.php <stdin >stdout <--help>";
     exit(0);
   } else {
     echo "Incorrect argument format";
@@ -35,7 +35,7 @@ $file = array_values($file);
 // Check header
 $header = $file[0];
 $header = explode('#', $header);
-if (trim($header[0]) != '.IPPcode23') {
+if (strtolower(trim($header[0])) != '.ippcode23') {
   echo "Header missing or incorrect";
   exit(21);
 }
@@ -49,15 +49,14 @@ function checkVar($input) {
     // TODO: Check the correct exit number here.
     exit(23);
   }
-  return true;
+  return ['var', $input];
 }
 
 function checkLabel($input) {
   if (!preg_match('/^[a-zA-Z_\-\$\&\%\*\!\?][a-zA-Z0-9_\-\$\&\%\*\!\?]*$/', $input)) {
-    // TODO: Check the correct exit number here.
     exit(23);
   }
-  return true;
+  return ['label', $input];
 }
 
 function checkSymbol($input) {
@@ -70,11 +69,11 @@ function checkSymbol($input) {
     case 'GF':
     case 'LF':
     case 'TF':
-      if (!preg_match('/^[a-zA-Z_\-\$\&\%\*\!\?][a-zA-Z0-9_\-\$\&\%\*\!\?]*$/', $const[1])) exit(23);
-      return ['var', $input];
+      return checkVar($input);
       break;
     case 'int':
-      if (!is_numeric($const[1])) exit(23); 
+      if (!preg_match('/^[-+]?0x[\da-fA-F]+(?:_[\da-fA-F]+)*(?<!_)$/i', $const[1]) &&
+          !preg_match('/^[-+]?(?:(?:0|0o)[0-7]+|(?:0|[1-9]\d*))(?:_\d+)*(?<!_)$/i', $const[1])) exit(23);
       return [$const[0], $const[1]];
       break;
     case 'bool':
@@ -82,7 +81,6 @@ function checkSymbol($input) {
       return [$const[0], $const[1]];
       break;
     case 'string':
-      // TODO: What to check here?
       if (!preg_match('/^(?:[^\\\\]|\\\\(?=\d{3}))*$/', $const[1])) exit(23);
       return [$const[0], $const[1]];
       break;
@@ -91,8 +89,6 @@ function checkSymbol($input) {
       return [$const[0], $const[1]];
       break;
     default:
-      echo $const[0];
-      echo 'unknown const';
       exit(23);
   }
 }
@@ -132,118 +128,47 @@ foreach ($file as $key=>$line) {
   if (count($input) == 0) continue;
 
   switch(strtolower($input[0])) {
-    case 'move':
-      if (count($input) != 3) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-      addInstruction('MOVE', $order, $input[1], 'var', $arg2[1], $arg2[0]);
-      break;
     case 'createframe':
     case 'pushframe':
     case 'popframe':
     case 'return':
     case 'break':
       if (count($input) != 1) exit(23);
+
       addInstruction(strtoupper($input[0]), $order);
       break;
     case 'defvar':
+    case 'pops':
       if (count($input) != 2) exit(23);
       checkVar($input[1]);
-      addInstruction('DEFVAR', $order, $input[1], 'var');
+
+      addInstruction(strtoupper($input[0]), $order, $input[1], 'var');
       break;
     case 'call':
       if (count($input) != 2) exit(23);
       checkLabel($input[1]);
+
       addInstruction('CALL', $order, $input[1], 'label');
       break;
     case 'pushs':
       if (count($input) != 2) exit(23);
       $symb = checkSymbol($input[1]);
+
       addInstruction('PUSHS', $order, $symb[1], $symb[0]);
       break;
-    case 'pops':
-      if (count($input) != 2) exit(23);
-      checkVar($input[1]);
-      addInstruction('POPS', $order, $input[1], 'var');
-      break;
-    case 'add':
-    case 'sub':
-    case 'mul':
-    case 'idiv':
-      if (count($input) != 4) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-      $arg3 = checkSymbol($input[3]);
-
-      // If the numbers arent int but syntax is correct
-      // if ($arg2[0] != 'int' || $arg3[0] != 'int') exit(23);
-      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
-      break;
-    case 'lt':
-    case 'gt':
-    case 'eq':
-      if (count($input) != 4) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-      $arg3 = checkSymbol($input[3]);
-
-      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
-      break;
-    case 'and':
-    case 'or':
-      if (count($input) != 4) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-      $arg3 = checkSymbol($input[3]);
-
-      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
-      break;
-    case 'not':
+    case 'move':
       if (count($input) != 3) exit(23);
       checkVar($input[1]);
       $arg2 = checkSymbol($input[2]);
 
-      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0]);
-      break;
-    case 'int2char':
-      if (count($input) != 3) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-
-      addInstruction('INT2CHAR', $order, $input[1], 'var', $arg2[1], $arg2[0]);
-      break;
-    case 'stri2int':
-      if (count($input) != 4) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-      $arg3 = checkSymbol($input[3]);
-
-      addInstruction('STRI2INT', $order, $input[1], 'var', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
+      addInstruction('MOVE', $order, $input[1], 'var', $arg2[1], $arg2[0]);
       break;
     case 'read':
       if (count($input) != 3) exit(23);
       checkVar($input[1]);
       if (!preg_match('/^(bool|string|int)$/', $input[2])) exit(23);
-      
+
       addInstruction('READ', $order, $input[1], 'var', $input[2], 'type');
-      break;
-    case 'type':
-    case 'strlen':
-      if (count($input) != 3) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-
-      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0]);
-      break;
-    case 'concat':
-    case 'getchar':
-    case 'setchar':
-      if (count($input) != 4) exit(23);
-      checkVar($input[1]);
-      $arg2 = checkSymbol($input[2]);
-      $arg3 = checkSymbol($input[3]);
-
-      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
       break;
     case 'label':
     case 'jump':
@@ -252,16 +177,6 @@ foreach ($file as $key=>$line) {
 
       addInstruction(strtoupper($input[0]), $order, $input[1], 'label');
       break;
-    case 'jumpifeq':
-    case 'jumpifneq':
-      if (count($input) != 4) exit(23);
-      checkLabel($input[1]);
-      $arg2 = checkSymbol($input[2]);
-      $arg3 = checkSymbol($input[3]);
-
-      // if($arg2[0] != $arg3[0]) exit(23);
-      addInstruction(strtoupper($input[0]), $order, $input[1], 'label', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
-      break;
     case 'exit':
     case 'dprint':
     case 'write':
@@ -269,6 +184,45 @@ foreach ($file as $key=>$line) {
       $arg1 = checkSymbol($input[1]);
 
       addInstruction(strtoupper($input[0]), $order, $arg1[1], $arg1[0]);
+      break;
+    case 'not':
+    case 'int2char':
+    case 'type':
+    case 'strlen':
+      if (count($input) != 3) exit(23);
+      checkVar($input[1]);
+      $arg2 = checkSymbol($input[2]);
+
+      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0]);
+      break;
+    case 'add':
+    case 'sub':
+    case 'mul':
+    case 'idiv':
+    case 'lt':
+    case 'gt':
+    case 'eq':
+    case 'and':
+    case 'or':
+    case 'concat':
+    case 'getchar':
+    case 'setchar':
+    case 'stri2int':
+      if (count($input) != 4) exit(23);
+      checkVar($input[1]);
+      $arg2 = checkSymbol($input[2]);
+      $arg3 = checkSymbol($input[3]);
+
+      addInstruction(strtoupper($input[0]), $order, $input[1], 'var', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
+      break;
+    case 'jumpifeq':
+    case 'jumpifneq':
+      if (count($input) != 4) exit(23);
+      checkLabel($input[1]);
+      $arg2 = checkSymbol($input[2]);
+      $arg3 = checkSymbol($input[3]);
+
+      addInstruction(strtoupper($input[0]), $order, $input[1], 'label', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
       break;
     default:
       echo 'Unknown instruction';
