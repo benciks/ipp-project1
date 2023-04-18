@@ -1,22 +1,20 @@
 <?php
 ini_set('display_errors', 'stderr');
-// TODO: Add help prompt
 
 // Check arguments
 if (isset($argv[1])) {
   if ($argv[1] == '--help') {
-    echo "Usage: php parse.php <stdin >stdout <--help>";
+    echo "Pouzitie: php parse.php <stdin >stdout <--help>";
     exit(0);
   } else {
-    echo "Incorrect argument format";
-    exit(-1);
+    exit(10);
   }
 }
 
 // Get input from stdin
 $file = file_get_contents("php://stdin");
 if (!$file) {
-  echo "\nThe file doesn't exist or you don't have correct permissions!";
+  echo "\nSubor neexistuje alebo nemate dostatocne opravnenie!";
   exit(11);
 }
 
@@ -36,7 +34,7 @@ $file = array_values($file);
 $header = $file[0];
 $header = explode('#', $header);
 if (strtolower(trim($header[0])) != '.ippcode23') {
-  echo "Header missing or incorrect";
+  echo "Chybajuce alebo chybne zahlavie";
   exit(21);
 }
 
@@ -46,7 +44,6 @@ array_shift($file);
 // Regex to match variable syntax
 function checkVar($input) {
   if (!preg_match('/^(LF|TF|GF)@[a-zA-Z_\-\$\&\%\*\!\?][a-zA-Z0-9_\-\$\&\%\*\!\?]*$/', $input)) {
-    // TODO: Check the correct exit number here.
     exit(23);
   }
   return ['var', $input];
@@ -225,7 +222,7 @@ foreach ($file as $key=>$line) {
       addInstruction(strtoupper($input[0]), $order, $input[1], 'label', $arg2[1], $arg2[0], $arg3[1], $arg3[0]);
       break;
     default:
-      echo 'Unknown instruction';
+      echo 'Neznama alebo chybna instrukcia';
       exit(22);
   }
 }
